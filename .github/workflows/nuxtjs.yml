@@ -1,55 +1,60 @@
 # .github/workflows/deploy.yml
 #
-# Builds a Nuxt 3 site (static output) and publishes it on GitHub Pages.
-# Make sure your nuxt.config has:
-#   export default defineNuxtConfig({
-#     ssr: false,
-#     app: { baseURL: '/<repo-name>/' },
-#     nitro: { preset: 'static' }
-#   })
+# Build a Nuxt 3 site with pnpm and publish it to GitHub Pages.
 
 name: Deploy Nuxt site to GitHub Pages
 
 on:
   push:
-    branches: [main]      # run on every push to main
-  workflow_dispatch:      # allow manual runs from the Actions tab
+    branches: [main]          # run on every push to main
+  workflow_dispatch:          # allow manual runs
 
 permissions:
-  contents: read          # pull the source
-  pages: write            # push to gh-pages
-  id-token: write         # OIDC for deploy-pages action
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: "pages"          # only one deploy at a time
-  cancel-in-progress: false
+  group: "pages"
+  cancel-in-progress: false   # let in-flight deploys finish
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥  Checkout source
-        uses: actions/checkout@v4
+      # 1 — checkout the repo
+      - uses: actions/checkout@v4
 
-      - name: 🏗️  Set up Node
+      # 2 — setup Node *and* enable pnpm caching
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: npm                # requires package-lock.json
+          node-version: 20
+          cache: pnpm            # looks for pnpm-lock.yaml
 
-      - name: 📦  Install dependencies
-        run: npm ci                 # reproducible install from lock-file
+      # 3 — enable Corepack and make sure pnpm is available
+      - name: Enable pnpm via Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate   # pin a specific version if you like
 
-      - name: ⚙️  Configure Pages for Nuxt
+      # 4 — install deps from the lock-file
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 5 — tell the Pages helper we’re building Nuxt (injects correct baseURL, etc.)
+      - name: Configure Pages for Nuxt
         uses: actions/configure-pages@v5
         with:
           static_site_generator: nuxt
 
-      - name: 🛠️  Generate static site
-        run: npm run generate       # output → .output/public
+      # 6 — generate the static site
+      - name: Generate static site
+        run: pnpm generate        # output → .output/public
 
-      - name: 📤  Upload artifact
+      # 7 — upload that folder as an artifact for the deploy job
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./.output/public
@@ -62,6 +67,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: 🚀  Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
