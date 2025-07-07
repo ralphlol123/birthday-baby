@@ -1,72 +1,85 @@
 # .github/workflows/deploy.yml
 #
-# Build a Nuxt 3 site with pnpm and publish it to GitHub Pages.
+# Build a Nuxt 3 site with pnpm and publish it on GitHub Pages
+# ────────────────────────────────────────────────────────────
 
 name: Deploy Nuxt site to GitHub Pages
 
 on:
   push:
     branches: [main]          # run on every push to main
-  workflow_dispatch:          # allow manual runs
+  workflow_dispatch:          # allow “Run workflow” button
 
 permissions:
   contents: read
-  pages: write
+  pages:    write
   id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false   # let in-flight deploys finish
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1 — checkout the repo
+      # ───────────────────────────
+      # 1. Check out the repository
       - uses: actions/checkout@v4
 
-      # 2 — setup Node *and* enable pnpm caching
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      # ───────────────────────────
+      # 2. Install the required Node version
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: pnpm            # looks for pnpm-lock.yaml
+          node-version: 20         # any LTS is fine
 
-      # 3 — enable Corepack and make sure pnpm is available
-      - name: Enable pnpm via Corepack
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate   # pin a specific version if you like
+      # ───────────────────────────
+      # 3. Install pnpm *and* add it to $PATH
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8               # pin the major you use locally
+          run_install: false       # we’ll do install after caching
 
-      # 4 — install deps from the lock-file
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # ───────────────────────────
+      # 4. Restore / save pnpm’s store (fast repeat builds)
+      - name: Restore pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
-      # 5 — tell the Pages helper we’re building Nuxt (injects correct baseURL, etc.)
-      - name: Configure Pages for Nuxt
-        uses: actions/configure-pages@v5
+      # ───────────────────────────
+      # 5. Install dependencies from the lock-file
+      - run: pnpm install --frozen-lockfile
+
+      # ───────────────────────────
+      # 6. Let GitHub Pages helper tweak nuxt.config (baseURL, etc.)
+      - uses: actions/configure-pages@v5
         with:
           static_site_generator: nuxt
 
-      # 6 — generate the static site
-      - name: Generate static site
-        run: pnpm generate        # output → .output/public
+      # ───────────────────────────
+      # 7. Generate the static site   → .output/public
+      - run: pnpm generate
 
-      # 7 — upload that folder as an artifact for the deploy job
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      # ───────────────────────────
+      # 8. Upload the static files as an artifact for the deploy job
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: ./.output/public
 
+  # ───────────────────────────────
+  # Publish the artifact to gh-pages
   deploy:
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url:  ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
+      - id: deployment
         uses: actions/deploy-pages@v4
