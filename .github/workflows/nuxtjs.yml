@@ -53,7 +53,7 @@ jobs:
 
       # ───────────────────────────
       # 5. Install dependencies from the lock-file
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install 
 
       # ───────────────────────────
       # 6. Let GitHub Pages helper tweak nuxt.config (baseURL, etc.)
