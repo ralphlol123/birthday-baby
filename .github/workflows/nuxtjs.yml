@@ -1,85 +1,48 @@
 # .github/workflows/deploy.yml
-#
-# Build a Nuxt 3 site with pnpm and publish it on GitHub Pages
-# ────────────────────────────────────────────────────────────
-
 name: Deploy Nuxt site to GitHub Pages
 
 on:
   push:
-    branches: [main]          # run on every push to main
-  workflow_dispatch:          # allow “Run workflow” button
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
-  pages:    write
+  pages: write
   id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    env:
+      NITRO_PRESET: github_pages
+      NUXT_APP_BASE_URL: /birthday-baby/
     steps:
-      # ───────────────────────────
-      # 1. Check out the repository
       - uses: actions/checkout@v4
 
-      # ───────────────────────────
-      # 2. Install the required Node version
       - uses: actions/setup-node@v4
         with:
-          node-version: 20         # any LTS is fine
+          node-version: 20
+          cache: pnpm
 
-      # ───────────────────────────
-      # 3. Install pnpm *and* add it to $PATH
       - uses: pnpm/action-setup@v2
-        with:
-          version: 8               # pin the major you use locally
-          run_install: false       # we’ll do install after caching
+        with: { version: 8 }
 
-      # ───────────────────────────
-      # 4. Restore / save pnpm’s store (fast repeat builds)
-      - name: Restore pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
+      - run: pnpm install
 
-      # ───────────────────────────
-      # 5. Install dependencies from the lock-file
-      - run: pnpm install 
+      # --- generate the *static* site -----------------
+      - run: pnpm run generate       # outputs to .output/public
 
-      # ───────────────────────────
-      # 6. Let GitHub Pages helper tweak nuxt.config (baseURL, etc.)
-      - uses: actions/configure-pages@v5
-        with:
-          static_site_generator: nuxt
-
-      # ───────────────────────────
-      # 7. Generate the static site   → .output/public
-      - run: pnpm generate
-
-      # ───────────────────────────
-      # 8. Upload the static files as an artifact for the deploy job
+      # (Nuxt drops a .nojekyll file for you with the github_pages preset)
       - uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./.output/public
+        with: { path: ./.output/public }
 
-  # ───────────────────────────────
-  # Publish the artifact to gh-pages
   deploy:
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url:  ${{ steps.deployment.outputs.page_url }}
-
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
