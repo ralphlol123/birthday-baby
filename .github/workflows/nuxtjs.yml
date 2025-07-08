@@ -1,41 +1,54 @@
 # .github/workflows/deploy.yml
+#
+# Build & publish the static Nuxt site to GitHub Pages.
+# Only two jobs: build  →  deploy
+# ────────────────────────────────────────────────
 name: Deploy Nuxt site to GitHub Pages
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    branches: [main]      # rebuild on every push to main
+  workflow_dispatch:      # manual “Run workflow” button
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: read          # allow checkout
+  pages:    write         # allow deployment
+  id-token: write         # required by deploy-pages@v4
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      NITRO_PRESET: github_pages
+      # Make Nuxt & the preset emit the right paths
       NUXT_APP_BASE_URL: /birthday-baby/
+      # Redundant but explicit — same effect as nitro.preset above
+      NITRO_PRESET: github_pages
+
     steps:
+      # 1️⃣  Grab the repo
       - uses: actions/checkout@v4
 
+      # 2️⃣  Node LTS + automatic pnpm cache
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
+      # 3️⃣  Install pnpm itself
       - uses: pnpm/action-setup@v2
-        with: { version: 8 }
+        with:
+          version: 8
 
-      - run: pnpm install
+      # 4️⃣  Install deps from lock-file
+      - run: pnpm install --frozen-lockfile
 
-      # --- generate the *static* site -----------------
-      - run: pnpm run generate       # outputs to .output/public
+      # 5️⃣  Generate the static site → .output/public
+      - run: pnpm run generate
 
-      # (Nuxt drops a .nojekyll file for you with the github_pages preset)
+      # 6️⃣  Upload artefact for the deploy job
       - uses: actions/upload-pages-artifact@v3
-        with: { path: ./.output/public }
+        with:
+          path: ./.output/public
 
   deploy:
     needs: build
@@ -43,6 +56,7 @@ jobs:
     environment:
       name: github-pages
       url:  ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
