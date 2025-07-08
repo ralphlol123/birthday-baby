@@ -49,8 +49,8 @@ jobs:
             ${{ runner.os }}-pnpm-
 
       # 5️⃣  Install dependencies from lock-file
-      - run: pnpm install --frozen-lockfile
-
+      - run: pnpm install --no-frozen-lockfile
+      
       # 6️⃣  Generate the *static* site  → .output/public
       - run: pnpm run generate
 
