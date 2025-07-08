@@ -42,7 +42,7 @@
           <p>Your Admirer</p>
         </footer> -->
 
-        <NuxtLink to="/valentine">
+        <NuxtLink to="/fireworks">
             <button v-if="showNextButton" class="next-button">
                 Next
             </button>
